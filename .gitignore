@@ -2,3 +2,4 @@
 Lib/
 Scripts/
 Include/
+__pycache__/
