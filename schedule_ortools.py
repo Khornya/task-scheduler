@@ -83,29 +83,35 @@ def schedule(tasks, reserved_intervals, reserved_tags, start):
         model.AddMultiplicationEquality(opt_raw_priority_var, [raw_priority, is_present_var])
         # Final priority is initial priority x delay
         priority_var = model.NewIntVar(-max_raw_priority * 100, max_raw_priority * max_delay, 'priority' + suffix)
-        model.AddMultiplicationEquality(priority_var, [raw_priority, delay_var]) # , is_present_var ?
+        model.AddMultiplicationEquality(priority_var, [raw_priority, delay_var])
         # Priority should be 0 if event is not present
         opt_priority_var = model.NewIntVar(-max_raw_priority * 100, max_raw_priority * max_delay, 'opt_priority' + suffix)
         model.AddMultiplicationEquality(opt_priority_var, [priority_var, is_present_var])
         # Prevent reserved intervals from overlapping
-        incompatible_intervals: cp_model.IntervalVar = []
-        compatible_intervals: cp_model.IntervalVar = []
-        if (len(tags[task_id])):
-            # if task is tagged, compatible intervals have all task tags and we remove duration of task
-            compatible_intervals = [model.NewIntervalVar(compatible_interval.interval.StartExpr(), compatible_interval.interval.EndExpr() - duration - compatible_interval.interval.StartExpr(), compatible_interval.interval.EndExpr() - duration, 'compatible_interval_' + suffix + '_' + str(index)) for index, compatible_interval in enumerate(reserved_tag_intervals) if all(task_tag in compatible_interval.tags for task_tag in tags[task_id])]
-        if (not(len(compatible_intervals)) or not(len(tags[task_id]))):
-            # if task is not tagged or has no compatible interval, prevent task from being assigned to reserved intervals (pb: task can't be assigned to compatible intervals ?)
-            incompatible_intervals = [reserved_interval.interval for reserved_interval in reserved_tag_intervals]
-        else:
+        incompatible_intervals: list[cp_model.IntervalVar] = []
+        compatible_intervals_by_tag: dict[str, list[cp_model.IntervalVar]] = {}
+        if not(len(tags[task_id])):
+            incompatible_intervals += [reserved_interval.interval for reserved_interval in reserved_tag_intervals]
+        for i, tag in enumerate(tags[task_id]):
+            for j, reserved_interval in enumerate(reserved_tag_intervals):
+                if tag in reserved_interval.tags:
+                    # add interval with tag as compatible and remove duration of task
+                    if (not(tag in compatible_intervals_by_tag)):
+                        compatible_intervals_by_tag[tag] = []
+                    compatible_intervals_by_tag[tag] += [model.NewIntervalVar(reserved_interval.interval.StartExpr(), reserved_interval.interval.EndExpr() - duration - reserved_interval.interval.StartExpr(), reserved_interval.interval.EndExpr() - duration, 'compatible_interval' + suffix + '_' + tag + '_' + str(index))]
+                else:
+                    # add interval with tag as incompatible
+                    incompatible_intervals += reserved_interval
             start_in_interval_vars = []
-            for index, compatible_interval in enumerate(compatible_intervals):
-                start_in_interval_var = model.NewBoolVar('start_in_interval' + suffix + '_' + str(index))
+            # each tag must fill a compatible interval
+            for index, compatible_interval in enumerate(compatible_intervals_by_tag[tag]):
+                start_in_interval_var = model.NewBoolVar('start_in_interval' + suffix + '_' + tag + '_' + str(index))
                 model.Add(start_var >= compatible_interval.StartExpr()).OnlyEnforceIf(start_in_interval_var)
                 start_in_interval_vars.append(start_in_interval_var)
-            model.AddAtLeastOne(start_in_interval_vars) # at most one ? + boot prio when in reserved interval
-        incompatible_intervals += [reserved_interval for reserved_interval in reserved_event_intervals]
+            model.AddAtLeastOne(start_in_interval_vars)
+        incompatible_intervals += reserved_event_intervals
         model.AddNoOverlap(incompatible_intervals + [interval_var])
-        # Add task vars to all_tasks0
+        # Add task vars to all_tasks
         all_tasks[task_id] = task_type(
             id=tasks.iloc[task_id]['id'],
             start=start_var,
