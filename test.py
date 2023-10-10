@@ -146,3 +146,45 @@ def test_schedule_event_should_plan_events_with_best_impact_per_hour_first():
     assert result["tasks"][4]["isPresent"] == True
     assert result["tasks"][5]["isPresent"] == False
     assert result["tasks"][6]["isPresent"] == True
+
+
+def test_schedule_event_should_not_plan_in_reserved_interval_if_one_tag_does_not_match_case_task_tag():
+    tasks = pd.DataFrame({
+        "id": [1],
+        "impact": [2],
+        "duration": [3],
+        "dueDate": [10],
+        "maxDueDate": [15],
+        "tags": [['Perso','Autre']]
+    }, dtype=object)
+    reserved_intervals = pd.DataFrame([])
+    reserved_tags = pd.DataFrame({
+        "start": [0],
+        "end": [5],
+        "tags": [['Perso']]
+    }, dtype=object)
+    start = 0
+    result = schedule(tasks, reserved_intervals, reserved_tags, start)
+    assert result["found"] == True
+    assert result["tasks"][1]["start"] >= 5
+
+
+def test_schedule_event_should_plan_in_reserved_interval_event_if_one_tag_does_not_match_case_reserved_tag():
+    tasks = pd.DataFrame({
+        "id": [1],
+        "impact": [2],
+        "duration": [3],
+        "dueDate": [10],
+        "maxDueDate": [15],
+        "tags": [['Perso']]
+    }, dtype=object)
+    reserved_intervals = pd.DataFrame([])
+    reserved_tags = pd.DataFrame({
+        "start": [0],
+        "end": [5],
+        "tags": [['Perso', 'Autre']]
+    }, dtype=object)
+    start = 0
+    result = schedule(tasks, reserved_intervals, reserved_tags, start)
+    assert result["found"] == True
+    assert result["tasks"][1]["start"] == 0

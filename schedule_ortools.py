@@ -101,14 +101,15 @@ def schedule(tasks, reserved_intervals, reserved_tags, start):
                     compatible_intervals_by_tag[tag] += [model.NewIntervalVar(reserved_interval.interval.StartExpr(), reserved_interval.interval.EndExpr() - duration - reserved_interval.interval.StartExpr(), reserved_interval.interval.EndExpr() - duration, 'compatible_interval' + suffix + '_' + tag + '_' + str(index))]
                 else:
                     # add interval with tag as incompatible
-                    incompatible_intervals += reserved_interval
-            start_in_interval_vars = []
-            # each tag must fill a compatible interval
-            for index, compatible_interval in enumerate(compatible_intervals_by_tag[tag]):
-                start_in_interval_var = model.NewBoolVar('start_in_interval' + suffix + '_' + tag + '_' + str(index))
-                model.Add(start_var >= compatible_interval.StartExpr()).OnlyEnforceIf(start_in_interval_var)
-                start_in_interval_vars.append(start_in_interval_var)
-            model.AddAtLeastOne(start_in_interval_vars)
+                    incompatible_intervals += [reserved_interval.interval]
+            if tag in compatible_intervals_by_tag:
+                start_in_interval_vars = []
+                # each tag must fill a compatible interval
+                for index, compatible_interval in enumerate(compatible_intervals_by_tag[tag]):
+                    start_in_interval_var = model.NewBoolVar('start_in_interval' + suffix + '_' + tag + '_' + str(index))
+                    model.Add(start_var >= compatible_interval.StartExpr()).OnlyEnforceIf(start_in_interval_var)
+                    start_in_interval_vars.append(start_in_interval_var)
+                model.AddAtLeastOne(start_in_interval_vars)
         incompatible_intervals += reserved_event_intervals
         model.AddNoOverlap(incompatible_intervals + [interval_var])
         # Add task vars to all_tasks
