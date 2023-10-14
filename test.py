@@ -116,13 +116,14 @@ def test_schedule_event_should_plan_in_reserved_interval_if_one_tag_matches():
     }, dtype=object)
     reserved_intervals = pd.DataFrame([])
     reserved_tags = pd.DataFrame({
-        "start": [0],
+        "start": [2],
         "end": [5],
         "tags": [['Perso']]
     }, dtype=object)
     start = 0
     result = schedule(tasks, reserved_intervals, reserved_tags, start)
     assert result["found"] == True
+    assert result["tasks"][1]["start"] >= 2
     assert result["tasks"][1]["start"] < 5
 
 
@@ -169,7 +170,7 @@ def test_schedule_event_should_not_plan_in_reserved_interval_if_one_tag_does_not
     assert result["tasks"][1]["start"] >= 5
 
 
-def test_schedule_event_should_plan_in_reserved_interval_event_if_one_tag_does_not_match_case_reserved_tag():
+def test_schedule_event_should_plan_in_reserved_interval_even_if_one_tag_does_not_match_case_reserved_tag():
     tasks = pd.DataFrame({
         "id": [1],
         "impact": [2],
@@ -180,11 +181,11 @@ def test_schedule_event_should_plan_in_reserved_interval_event_if_one_tag_does_n
     }, dtype=object)
     reserved_intervals = pd.DataFrame([])
     reserved_tags = pd.DataFrame({
-        "start": [0],
+        "start": [2],
         "end": [5],
         "tags": [['Perso', 'Autre']]
     }, dtype=object)
     start = 0
     result = schedule(tasks, reserved_intervals, reserved_tags, start)
     assert result["found"] == True
-    assert result["tasks"][1]["start"] == 0
+    assert result["tasks"][1]["start"] >= 2
