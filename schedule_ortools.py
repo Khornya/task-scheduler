@@ -65,25 +65,23 @@ def schedule(tasks, reserved_intervals, reserved_tags, start):
         is_late_var = model.NewBoolVar('is_late' + suffix)
         # Task is modelized by an interval
         interval_var = model.NewOptionalIntervalVar(start_var, duration, end_var, is_present_var, 'interval' + suffix)
-        if pd.notna(maxDueDates[task_id]) and maxDueDates[task_id] != dueDates[task_id]:
-            # Create delay var
-            delay_var = model.NewIntVar(-100, max_delay, 'delay' + suffix)
-            model.AddDivisionEquality(delay_var, (dueDates[task_id] - end_var)*100, maxDueDates[task_id] - dueDates[task_id])
-            # Delay is negative if task is late
-            model.Add(delay_var < 0).OnlyEnforceIf(is_late_var) # delete ?
-            # Delay is positive if task is on time
-            model.Add(delay_var >= 0).OnlyEnforceIf(is_late_var.Not()) # delete ?
-        else:
-            # Create 0 delay var if due date is max due date
-            delay_var = model.NewConstant(0)
         # Task initial priority is impact per duration
         raw_priority = math.floor(impacts[task_id]*100/duration)
         # Initial priority should be 0 if event is not present
         opt_raw_priority_var = model.NewIntVar(0, max_raw_priority, 'raw_priority' + suffix)
         model.AddMultiplicationEquality(opt_raw_priority_var, [raw_priority, is_present_var])
-        # Final priority is initial priority x delay
-        priority_var = model.NewIntVar(-max_raw_priority * 100, max_raw_priority * max_delay, 'priority' + suffix)
-        model.AddMultiplicationEquality(priority_var, [raw_priority, delay_var])
+        if pd.notna(maxDueDates[task_id]) and maxDueDates[task_id] != dueDates[task_id]:
+            # Create delay var
+            delay_var = model.NewIntVar(-100, max_delay, 'delay' + suffix)
+            model.AddDivisionEquality(delay_var, (dueDates[task_id] - end_var)*100, maxDueDates[task_id] - dueDates[task_id])
+            # Final priority is initial priority x delay
+            priority_var = model.NewIntVar(-max_raw_priority * 100, max_raw_priority * max_delay, 'priority' + suffix)
+            model.AddMultiplicationEquality(priority_var, [raw_priority, delay_var])
+        else:
+            # Create 0 delay var if due date is max due date
+            delay_var = model.NewConstant(0)
+            # Final priority is initial priority
+            priority_var = model.NewIntVar(-max_raw_priority, max_raw_priority, 'priority' + suffix)
         # Priority should be 0 if task is not present
         opt_priority_var = model.NewIntVar(-max_raw_priority * 100, max_raw_priority * max_delay, 'opt_priority' + suffix)
         model.AddMultiplicationEquality(opt_priority_var, [priority_var, is_present_var])
@@ -109,10 +107,13 @@ def schedule(tasks, reserved_intervals, reserved_tags, start):
                 start_in_interval_vars = []
                 # Each task tag must fill a compatible interval
                 for index, compatible_interval in enumerate(compatible_intervals_by_tag[tag]):
-                    start_in_interval_var = model.NewBoolVar('start_in_interval' + suffix + '_' + tag + '_' + str(index))
-                    model.Add(start_var >= compatible_interval.StartExpr()).OnlyEnforceIf(start_in_interval_var)
-                    start_in_interval_vars.append(start_in_interval_var)
+                    included_in_interval_var = model.NewBoolVar('start_in_interval' + suffix + '_' + tag + '_' + str(index))
+                    model.Add(start_var >= compatible_interval.StartExpr()).OnlyEnforceIf(included_in_interval_var)
+                    model.Add(end_var <= compatible_interval.EndExpr()).OnlyEnforceIf(included_in_interval_var)
+                    start_in_interval_vars.append(included_in_interval_var)
                 model.AddAtLeastOne(start_in_interval_vars)
+            else:
+                model.Add(is_present_var == 0)
         # Add all reserved event intervals as incompatible
         incompatible_intervals += reserved_event_intervals
         # Task can't overlap incompatible intervals
@@ -180,7 +181,7 @@ def schedule(tasks, reserved_intervals, reserved_tags, start):
                         "start": solver.Value(v.start),
                         "isLate": bool(solver.Value(v.is_late)),
                         "isPresent": bool(solver.Value(v.is_present)),
-                        "duration": int(duration),
+                        "end": solver.Value(v.end),
                         "priority": solver.Value(v.priority),
                         "delay": solver.Value(v.delay)
                     } for k, v in all_tasks.items()

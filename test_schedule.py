@@ -167,7 +167,7 @@ def test_schedule_event_should_not_plan_in_reserved_interval_if_one_tag_does_not
     start = 0
     result = schedule(tasks, reserved_intervals, reserved_tags, start)
     assert result["found"] == True
-    assert result["tasks"][1]["start"] >= 5
+    assert result["tasks"][1]["isPresent"] == False
 
 
 def test_schedule_event_should_plan_in_reserved_interval_even_if_one_tag_does_not_match_case_reserved_tag():
@@ -189,3 +189,32 @@ def test_schedule_event_should_plan_in_reserved_interval_even_if_one_tag_does_no
     result = schedule(tasks, reserved_intervals, reserved_tags, start)
     assert result["found"] == True
     assert result["tasks"][1]["start"] >= 2
+
+
+def test_schedule_event_should_plan_events():
+    tasks = pd.DataFrame({
+        "id": ['2a6laipv4ttscfdo4kn6vj6hcv', 'c4rj4c33c4qjebb160q38b9k6gq3cb9o6sq68b9gcko66dr2c8ojgob6c4'],
+        "impact": [10, 60],
+        "duration": [2, 12],
+        "dueDate": [5661192, 5658000],
+        "maxDueDate": [5679924, 5658288],
+        "tags": [['Ouvré'], []]
+    }, dtype=object)
+    reserved_tags = pd.DataFrame({
+        "id": ['0', '121'],
+        "start": [5657544, 5658120],
+        "end": [5657664, 5658252],
+        "tags": [['Ouvré'], ['Ouvré']]
+    }, dtype=object)
+    reserved_intervals = pd.DataFrame({
+        "id": ['64o6cd1j6gr6abb46ks66b9k69ij2bb174rm4bb2c5i6cc1lcgr64phl6s'],
+        "start": [5675556],
+        "end": [5675568]
+    }, dtype=object)
+    result = schedule(tasks, reserved_intervals, reserved_tags, 5657816)
+    assert result["found"] == True
+    assert result["tasks"]['2a6laipv4ttscfdo4kn6vj6hcv']["isPresent"] == True
+    assert result["tasks"]['2a6laipv4ttscfdo4kn6vj6hcv']["start"] >= 5658120
+    assert result["tasks"]['2a6laipv4ttscfdo4kn6vj6hcv']["end"] <= 5658252
+    assert result["tasks"]['c4rj4c33c4qjebb160q38b9k6gq3cb9o6sq68b9gcko66dr2c8ojgob6c4']["isPresent"] == True
+    assert result["tasks"]['c4rj4c33c4qjebb160q38b9k6gq3cb9o6sq68b9gcko66dr2c8ojgob6c4']["end"] < 5658120
