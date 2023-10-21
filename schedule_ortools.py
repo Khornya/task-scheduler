@@ -11,7 +11,7 @@ assigned_task_type = collections.namedtuple('assigned_task_type', 'start task du
 reserved_tag_interval = collections.namedtuple('reserved_tag_interval', 'interval tags is_transparent')
 
 def schedule(tasks, reserved_intervals, reserved_tags, start):
-    debug = True
+    debug = False
 
     if debug:
         print('************ NEW SCHEDULE **************')
