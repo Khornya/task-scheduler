@@ -145,7 +145,9 @@ def schedule(tasks, reserved_intervals, reserved_tags, start):
         # Task can't overlap incompatible intervals
         if debug:
             print('Incompatible intervals found', incompatible_intervals)
-        model.AddNoOverlap(incompatible_intervals + [interval_var])
+        for incompatible_interval in incompatible_intervals:
+            print(incompatible_interval)
+            model.AddNoOverlap([incompatible_interval, interval_var])
         # Add task vars to all_tasks
         all_tasks[task_id] = task_type(
             id=tasks.iloc[task_id]['id'],
